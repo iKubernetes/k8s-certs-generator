@@ -79,13 +79,13 @@ function openssl_sign() {
 
 # Generate CSRs for all components
 openssl_req $CERT_DIR apiserver "/CN=kube-apiserver/O=kube-master"
-#openssl_req $CERT_DIR kubelet "/CN=kubelet/O=system:masters"
+openssl_req $CERT_DIR apiserver-kubelet-client "/CN=kube-apiserver-kubelet-client/O=system:masters"
 openssl_req $CERT_DIR kube-proxy "/CN=system:kube-proxy/O=kube-nodes"
 openssl_req $CERT_DIR ingress-server "/CN=${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 # Sign CSRs for all components
 openssl_sign $CA_CERT $CA_KEY $CERT_DIR apiserver apiserver_cert
-#openssl_sign $CA_CERT $CA_KEY $CERT_DIR kubelet client_cert
+openssl_sign $CA_CERT $CA_KEY $CERT_DIR apiserver-kubelet-client client_cert
 openssl_sign $CA_CERT $CA_KEY $CERT_DIR kube-proxy client_cert
 openssl_sign $CA_CERT $CA_KEY $CERT_DIR ingress-server server_cert
 
@@ -98,23 +98,23 @@ done
 # Use openssl for base64'ing instead of base64 which has different wrap behavior
 # between Linux and Mac.
 # https://stackoverflow.com/questions/46463027/base64-doesnt-have-w-option-in-mac 
-cat > $DIR/auth/kubeconfig << EOF
+cat > $DIR/auth/admin.kubeconfig << EOF
 apiVersion: v1
 kind: Config
 clusters:
-- name: my-cluster
+- name: ${CLUSTER_NAME}
   cluster:
-    server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:443
+    server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
     certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
 users:
-- name: kubelet
+- name: k8s-admin
   user:
-    client-certificate-data: $( openssl base64 -A -in $CERT_DIR/kubelet.crt ) 
-    client-key-data: $( openssl base64 -A -in $CERT_DIR/kubelet.key ) 
+    client-certificate-data: $( openssl base64 -A -in $CERT_DIR/apiserver-kubelet-client.crt ) 
+    client-key-data: $( openssl base64 -A -in $CERT_DIR/apiserver-kubelet-client.key ) 
 contexts:
 - context:
-    cluster: my-cluster
-    user: kubelet
+    cluster: ${CLUSTER_NAME}
+    user: k8s-admin
 EOF
 
 # Generate secret patches. We include the metadata here so

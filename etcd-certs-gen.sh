@@ -65,14 +65,13 @@ fi
 
 openssl_req $CERT_DIR peer "/CN=etcd"
 openssl_req $CERT_DIR server "/CN=etcd"
-openssl_req $CERT_DIR client "/CN=etcd"
+openssl_req $CERT_DIR apiserver-etcd-client "/CN=etcd"
     
 openssl_sign $CERT_DIR/ca.crt $CERT_DIR/ca.key $CERT_DIR peer etcd_peer_cert
 openssl_sign $CERT_DIR/ca.crt $CERT_DIR/ca.key $CERT_DIR server etcd_server_cert
-openssl_sign $CERT_DIR/ca.crt $CERT_DIR/ca.key $CERT_DIR client client_cert
+openssl_sign $CERT_DIR/ca.crt $CERT_DIR/ca.key $CERT_DIR apiserver-etcd-client client_cert
 
 cat $CERT_DIR/ca.crt > $CERT_DIR/ca_bundle.pem
-cat $CA_CERT >> $CERT_DIR/ca_bundle.pem
 
 # Add debug information to directories
 for CERT in $CERT_DIR/*.crt; do
