@@ -80,20 +80,24 @@ function openssl_sign() {
 # Generate CSRs for all components
 openssl_req $CERT_DIR apiserver "/CN=kube-apiserver/O=kube-master"
 openssl_req $CERT_DIR apiserver-kubelet-client "/CN=kube-apiserver-kubelet-client/O=system:masters"
-openssl_req $CERT_DIR kube-proxy "/CN=system:kube-proxy/O=kube-nodes"
+openssl_req $CERT_DIR kube-controller-manager "/CN=system:kube-controller-manager"
+openssl_req $CERT_DIR kube-scheduler "/CN=system:kube-scheduler"
+openssl_req $CERT_DIR kube-proxy "/CN=system:kube-proxy"
 openssl_req $CERT_DIR ingress-server "/CN=${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 # Sign CSRs for all components
 openssl_sign $CA_CERT $CA_KEY $CERT_DIR apiserver apiserver_cert
 openssl_sign $CA_CERT $CA_KEY $CERT_DIR apiserver-kubelet-client client_cert
+openssl_sign $CA_CERT $CA_KEY $CERT_DIR kube-controller-manager client_cert
+openssl_sign $CA_CERT $CA_KEY $CERT_DIR kube-scheduler client_cert
 openssl_sign $CA_CERT $CA_KEY $CERT_DIR kube-proxy client_cert
 openssl_sign $CA_CERT $CA_KEY $CERT_DIR ingress-server server_cert
 
 
 # Add debug information to directories
-for CERT in $CERT_DIR/*.crt; do
-    openssl x509 -in $CERT -noout -text > "${CERT%.crt}.txt"
-done
+#for CERT in $CERT_DIR/*.crt; do
+#    openssl x509 -in $CERT -noout -text > "${CERT%.crt}.txt"
+#done
 
 # Use openssl for base64'ing instead of base64 which has different wrap behavior
 # between Linux and Mac.
@@ -115,7 +119,73 @@ contexts:
 - context:
     cluster: ${CLUSTER_NAME}
     user: k8s-admin
+  name: k8s-admin@${CLUSTER_NAME}
+current-context: k8s-admin@${CLUSTER_NAME}
 EOF
+
+cat > $DIR/auth/controller-manager.conf << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: ${CLUSTER_NAME}
+  cluster:
+    server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
+    certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
+users:
+- name: system:kube-controller-manager
+  user:
+    client-certificate-data: $( openssl base64 -A -in $CERT_DIR/kube-controller-manager.crt ) 
+    client-key-data: $( openssl base64 -A -in $CERT_DIR/kube-controller-manager.key ) 
+contexts:
+- context:
+    cluster: ${CLUSTER_NAME}
+    user: system:kube-controller-manager
+  name: system:kube-controller-manager@${CLUSTER_NAME}
+current-context: system:kube-controller-manager@${CLUSTER_NAME}
+EOF
+
+cat > $DIR/auth/scheduler.conf << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: ${CLUSTER_NAME}
+  cluster:
+    server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
+    certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
+users:
+- name: k8s-admin
+  user:
+    client-certificate-data: $( openssl base64 -A -in $CERT_DIR/kube-scheduler.crt ) 
+    client-key-data: $( openssl base64 -A -in $CERT_DIR/kube-scheduler.key ) 
+contexts:
+- context:
+    cluster: ${CLUSTER_NAME}
+    user: system:kube-scheduler
+  name: system:kube-scheduler@${CLUSTER_NAME}
+current-context: system:kube-scheduler@${CLUSTER_NAME}
+EOF
+
+cat > $DIR/auth/kube-proxy.conf << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: ${CLUSTER_NAME}
+  cluster:
+    server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
+    certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
+users:
+- name: k8s-admin
+  user:
+    client-certificate-data: $( openssl base64 -A -in $CERT_DIR/kube-proxy.crt ) 
+    client-key-data: $( openssl base64 -A -in $CERT_DIR/kube-proxy.key ) 
+contexts:
+- context:
+    cluster: ${CLUSTER_NAME}
+    user: system:kube-proxy
+  name: system:kube-proxy@${CLUSTER_NAME}
+current-context: system:kube-proxy@${CLUSTER_NAME}
+EOF
+
 
 # Generate secret patches. We include the metadata here so
 # `kubectl patch -f ( file ) -p $( cat ( file ) )` works.
@@ -154,9 +224,9 @@ if [ -n $FRONT_PROXY_CA_CERT ]; then
     openssl_sign $CERT_DIR/front-proxy-ca.crt $CERT_DIR/front-proxy-ca.key $CERT_DIR front-proxy-client client_cert
 
     # Add debug information to directories
-    for CERT in $CERT_DIR/front-proxy-*.crt; do
-        openssl x509 -in $CERT -noout -text > "${CERT%.crt}.txt"
-    done
+    #for CERT in $CERT_DIR/front-proxy-*.crt; do
+    #    openssl x509 -in $CERT -noout -text > "${CERT%.crt}.txt"
+    #done
 fi
 
 # Clean up openssl config
