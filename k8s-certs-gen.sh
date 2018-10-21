@@ -153,7 +153,7 @@ clusters:
     server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
     certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
 users:
-- name: k8s-admin
+- name: system:kube-scheduler
   user:
     client-certificate-data: $( openssl base64 -A -in $CERT_DIR/kube-scheduler.crt ) 
     client-key-data: $( openssl base64 -A -in $CERT_DIR/kube-scheduler.key ) 
