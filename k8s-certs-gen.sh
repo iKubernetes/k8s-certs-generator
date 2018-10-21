@@ -102,7 +102,7 @@ openssl_sign $CA_CERT $CA_KEY $CERT_DIR ingress-server server_cert
 # Use openssl for base64'ing instead of base64 which has different wrap behavior
 # between Linux and Mac.
 # https://stackoverflow.com/questions/46463027/base64-doesnt-have-w-option-in-mac 
-cat > $DIR/auth/admin.kubeconfig << EOF
+cat > $DIR/auth/admin.conf << EOF
 apiVersion: v1
 kind: Config
 clusters:
@@ -174,7 +174,7 @@ clusters:
     server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
     certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
 users:
-- name: k8s-admin
+- name: system:kube-proxy
   user:
     client-certificate-data: $( openssl base64 -A -in $CERT_DIR/kube-proxy.crt ) 
     client-key-data: $( openssl base64 -A -in $CERT_DIR/kube-proxy.key ) 
