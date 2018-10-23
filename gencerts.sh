@@ -23,11 +23,13 @@ if [ "$1" == 'k8s' ]; then
     read -p "Enter Kubernetes Cluster Name [kubernetes]: " CLUSTER_NAME
     echo -n -e "Enter the IP Address in default namespace \n  of the Kubernetes API Server[10.96.0.1]: "
     read  APISERVER_CLUSTER_IP
+    read -p "Enter Master servers name[master01 master02 master03]: " MASTERS
 
     CLUSTER_NAME=${CLUSTER_NAME:-kubernetes}
     APISERVER_CLUSTER_IP=${APISERVER_CLUSTER_IP:-10.96.0.1}
+    MASTERS=${MASTERS:-"master01 master02 master03"}
 
-    export CLUSTER_NAME APISERVER_CLUSTER_IP
+    export CLUSTER_NAME APISERVER_CLUSTER_IP MASTERS
 
     bash ./k8s-certs-gen.sh kubernetes
 fi
