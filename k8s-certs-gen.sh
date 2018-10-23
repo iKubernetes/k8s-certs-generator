@@ -131,6 +131,10 @@ for master in $MASTERS; do
     echo "Copy front-proxy CA key and cert file to ${master_dir}"
     cp $front_proxy_dir/front-proxy* ${master_dir}/pki/
 
+    echo "Generating the ServiceAccount key for apiserver"
+    openssl ecparam -name secp521r1 -genkey -noout -out ${master_dir}/pki/sa.key
+    openssl ec -in sa.key -outform PEM -pubout -out ${master_dir}/pki/sa.pub
+
     echo "Generating kubeconfig for kube-controller-manager"
     cat > ${master_dir}/auth/controller-manager.conf << EOF
 apiVersion: v1
