@@ -208,6 +208,7 @@ mkdir -p ${kubelet_dir}/{pki,auth}
 
 openssl_req ${kubelet_dir}/pki kube-proxy "/CN=system:kube-proxy"
 openssl_sign $CA_CERT $CA_KEY ${kubelet_dir}/pki kube-proxy client_cert
+rm -f ${kubelet_dir}/pki/kube-proxy.csr
 
 cat > ${kubelet_dir}/auth/kube-proxy.conf << EOF
 apiVersion: v1
