@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+ETCD_CERTS_DIR="etcd"
+
 function usage() {
     >&2 cat << EOF
 Usage: ./k8s-certs-gen.sh
@@ -129,20 +131,25 @@ for master in $MASTERS; do
     openssl_sign $CA_CERT $CA_KEY "${master_dir}/pki" apiserver-kubelet-client client_cert
     rm -f ${master_dir}/pki/*.csr
 
-    echo "Copy CA key and cert file to ${master_dir}"
+    # Copy CA key and cert file to ${master_dir}
     cp $CA_CERT $CA_KEY ${master_dir}/pki/
 
-    echo "Copy front-proxy CA key and cert file to ${master_dir}"
+    # Copy front-proxy CA key and cert file to ${master_dir}
     cp $front_proxy_dir/front-proxy* ${master_dir}/pki/
 
-    echo "Generating the ServiceAccount key for apiserver"
+    # echo "Generating the ServiceAccount key for apiserver"
     openssl ecparam -name secp521r1 -genkey -noout -out ${master_dir}/pki/sa.key
     openssl ec -in ${master_dir}/pki/sa.key -outform PEM -pubout -out ${master_dir}/pki/sa.pub
    
-    echo "Copy token file"
+    # echo "Copy token file"
     cp /tmp/token.csv ${master_dir}/
+    
+    if [ -d "$ETCD_CERTS_DIR" ]; then
+        # echo "Copy etcd client key and certs"
+	cp $ETCD_CERTS_DIR/pki/apiserver-etcd-client.{key,crt} ${master_dir}/pki/
+    fi
 
-    echo "Generating kubeconfig for kube-controller-manager"
+    # echo "Generating kubeconfig for kube-controller-manager"
     cat > ${master_dir}/auth/controller-manager.conf << EOF
 apiVersion: v1
 kind: Config
@@ -164,7 +171,7 @@ contexts:
 current-context: system:kube-controller-manager@${CLUSTER_NAME}
 EOF
 
-    echo "Generating kubeconfig for kube-scheduler"
+    # echo "Generating kubeconfig for kube-scheduler"
     cat > ${master_dir}/auth/scheduler.conf << EOF
 apiVersion: v1
 kind: Config
@@ -186,7 +193,7 @@ contexts:
 current-context: system:kube-scheduler@${CLUSTER_NAME}
 EOF
 
-    echo "Generating kubeconfig for Cluster Admin"
+    # echo "Generating kubeconfig for Cluster Admin"
     cat > ${master_dir}/auth/admin.conf << EOF
 apiVersion: v1
 kind: Config

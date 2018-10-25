@@ -66,32 +66,22 @@ fi
 openssl_req $CERT_DIR peer "/CN=etcd"
 openssl_req $CERT_DIR server "/CN=etcd"
 openssl_req $CERT_DIR apiserver-etcd-client "/CN=etcd"
+openssl_req $CERT_DIR client "/CN=etcd"
     
 openssl_sign $CERT_DIR/ca.crt $CERT_DIR/ca.key $CERT_DIR peer etcd_peer_cert
 openssl_sign $CERT_DIR/ca.crt $CERT_DIR/ca.key $CERT_DIR server etcd_server_cert
 openssl_sign $CERT_DIR/ca.crt $CERT_DIR/ca.key $CERT_DIR apiserver-etcd-client client_cert
-
-cat $CERT_DIR/ca.crt > $CERT_DIR/ca_bundle.pem
+openssl_sign $CERT_DIR/ca.crt $CERT_DIR/ca.key $CERT_DIR client client_cert
 
 # Add debug information to directories
-for CERT in $CERT_DIR/*.crt; do
-    openssl x509 -in $CERT -noout -text > "${CERT%.crt}.txt"
-done
+#for CERT in $CERT_DIR/*.crt; do
+#    openssl x509 -in $CERT -noout -text > "${CERT%.crt}.txt"
+#done
 
 ETCD_PATCHES=$DIR/patches
 mkdir -p $ETCD_PATCHES
 
 # kubectl apply 
-cat > $ETCD_PATCHES/etcd-ca.patch << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: kube-apiserver
-  namespace: kube-system
-data:
-  etcd-client-ca.crt: $( openssl base64 -A -in ${ETCD}/ca_bundle.pem )
-EOF
-
 cat > $ETCD_PATCHES/etcd-client-cert.patch << EOF
 apiVersion: v1
 kind: Secret
