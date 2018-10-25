@@ -104,6 +104,10 @@ if [ -n $FRONT_PROXY_CA_CERT ]; then
     rm -f ${front_proxy_dir}/*.csr
 fi
 
+# BootStrap Token
+export BOOTSTRAP_TOKEN="$(head -c 6 /dev/urandom | md5sum | head -c 6).$(head -c 16 /dev/urandom | md5sum | head -c 16)"
+echo "$BOOTSTRAP_TOKEN,\"system:bootstrapper\",10001,\"system:bootstrappers\"" > /tmp/token.csv
+
 # Generate and sihn CSRs for all components of masters
 for master in $MASTERS; do
     master_dir="${DIR}/${master}"
@@ -134,6 +138,9 @@ for master in $MASTERS; do
     echo "Generating the ServiceAccount key for apiserver"
     openssl ecparam -name secp521r1 -genkey -noout -out ${master_dir}/pki/sa.key
     openssl ec -in ${master_dir}/pki/sa.key -outform PEM -pubout -out ${master_dir}/pki/sa.pub
+   
+    echo "Copy token file"
+    cp /tmp/token.csv ${master_dir}/
 
     echo "Generating kubeconfig for kube-controller-manager"
     cat > ${master_dir}/auth/controller-manager.conf << EOF
@@ -202,16 +209,13 @@ current-context: k8s-admin@${CLUSTER_NAME}
 EOF
 done
 
+
 # Generate key and cert for kubelet
 kubelet_dir=${DIR}/kubelet
 mkdir -p ${kubelet_dir}/{pki,auth}
 
 openssl_req ${kubelet_dir}/pki kube-proxy "/CN=system:kube-proxy"
 openssl_sign $CA_CERT $CA_KEY ${kubelet_dir}/pki kube-proxy client_cert
-rm -f ${kubelet_dir}/pki/kube-proxy.csr
-
-# Copy the CA cert
-cp $CA_CERT ${kubelet_dir}/pki/ 
 
 cat > ${kubelet_dir}/auth/kube-proxy.conf << EOF
 apiVersion: v1
@@ -232,6 +236,26 @@ contexts:
     user: system:kube-proxy
   name: system:kube-proxy@${CLUSTER_NAME}
 current-context: system:kube-proxy@${CLUSTER_NAME}
+EOF
+
+cat > ${kubelet_dir}/auth/bootstrap.conf << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- name: ${CLUSTER_NAME}
+  cluster:
+    server: https://${CLUSTER_NAME}-api.${BASE_DOMAIN}:6443
+    certificate-authority-data: $( openssl base64 -A -in $CA_CERT ) 
+users:
+- name: system:bootstrapper
+  user:
+    token: ${BOOTSTRAP_TOKEN}
+contexts:
+- context:
+    cluster: ${CLUSTER_NAME}
+    user: system:bootstrapper
+  name: system:bootstrapper@${CLUSTER_NAME}
+current-context: system:bootstrapper@${CLUSTER_NAME}
 EOF
 
 # Generate key and cert for ingress
@@ -259,3 +283,4 @@ EOF
 rm -f $CERT_DIR/index*
 rm -f $CERT_DIR/100*
 rm -f $CERT_DIR/serial*
+rm -f /tmp/token.csv
